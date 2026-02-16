@@ -1,0 +1,34 @@
+name: Cross-Repo Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Optional message to include in dispatch payload'
+        required: false
+        default: 'manual dispatch from conductor'
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      OWNER: meekotharaccoon-cell
+      TARGET_REPOS: atomic-agents,atomic-agents-staging,atomic-agents-demo
+    steps:
+      - name: Dispatch to target repos
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.CONDUCTOR_TOKEN }}
+          script: |
+            const repos = process.env.TARGET_REPOS.split(',');
+            const owner = process.env.OWNER;
+            const msg = github.context.payload.inputs.message || 'manual dispatch from conductor';
+            for (const repo of repos) {
+              await github.repos.createDispatchEvent({
+                owner: owner,
+                repo: repo,
+                event_type: 'conductor_dispatch',
+                client_payload: { message: msg }
+              });
+              core.info(`Dispatched to ${repo}`);
+            }
