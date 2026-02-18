@@ -1,36 +1,52 @@
 name: Cross-Repo Dispatch
 
 on:
+  repository_dispatch:
+    types: [conductor_dispatch, grand-setup-complete, agent-task, health-check]
   workflow_dispatch:
     inputs:
       message:
-        description: 'Optional message to include in dispatch payload'
+        description: Message to include in dispatch payload
         required: false
-        default: 'manual dispatch from conductor'
+        default: manual dispatch from conductor
 
 jobs:
   dispatch:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-    runs-on: ubuntu-latest
     env:
       OWNER: meekotharaccoon-cell
       TARGET_REPOS: atomic-agents,atomic-agents-staging,atomic-agents-demo
     steps:
-      - name: Dispatch to target repos
-        uses: actions/github-script@v6
+      - name: Dispatch to all repos
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.CONDUCTOR_TOKEN }}
           script: |
             const repos = process.env.TARGET_REPOS.split(',');
             const owner = process.env.OWNER;
-            const msg = github.context.payload.inputs.message || 'manual dispatch from conductor';
+            const payload = github.context.payload || {};
+            const msg = (
+              payload?.inputs?.message ||
+              payload?.client_payload?.message ||
+              context.eventName + ' trigger'
+            );
             for (const repo of repos) {
-              await github.repos.createDispatchEvent({
-                owner: owner,
-                repo: repo,
-                event_type: 'conductor_dispatch',
-                client_payload: { message: msg }
-              });
-              core.info(`Dispatched to ${repo}`);
+              try {
+                await github.rest.repos.createDispatchEvent({
+                  owner,
+                  repo,
+                  event_type: 'conductor_dispatch',
+                  client_payload: {
+                    message: msg,
+                    source: 'conductor',
+                    timestamp: new Date().toISOString()
+                  }
+                });
+                core.info('Dispatched to ' + repo);
+              } catch(e) {
+                core.warning('Failed ' + repo + ': ' + e.message);
+              }
             }
+            core.info('All dispatches complete');
