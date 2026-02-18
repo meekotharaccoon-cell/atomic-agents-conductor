@@ -10,6 +10,8 @@ on:
 
 jobs:
   dispatch:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     env:
       OWNER: meekotharaccoon-cell
