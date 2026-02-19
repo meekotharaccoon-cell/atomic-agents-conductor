@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       message:
-        description: Message to dispatch
+        description: Message to include in dispatch payload
         required: false
-        default: manual dispatch
+        default: manual dispatch from conductor
 
 jobs:
   dispatch:
@@ -26,9 +26,10 @@ jobs:
           script: |
             const repos = process.env.TARGET_REPOS.split(',');
             const owner = process.env.OWNER;
+            const payload = github.context.payload || {};
             const msg = (
-              context.payload?.inputs?.message ||
-              context.payload?.client_payload?.message ||
+              payload?.inputs?.message ||
+              payload?.client_payload?.message ||
               context.eventName + ' trigger'
             );
             for (const repo of repos) {
